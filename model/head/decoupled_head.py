@@ -6,8 +6,8 @@
 import torch
 import torch.nn as nn
 
-from yolo.model.basic_block import ConvBnAct
-from yolo.model.get_build_config import *
+from yolo_duplicate.model.basic_block import ConvBnAct
+from yolo_duplicate.model.get_build_config import *
 
 
 class DecoupleHead(nn.Module):

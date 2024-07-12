@@ -8,8 +8,8 @@ import math
 import torch
 import torch.nn as nn
 
-from yolo.model.basic_block import CSPSPPF, BiC, RepStageBlock, ConvBnAct
-from yolo.model.get_build_config import *
+from yolo_duplicate.model.basic_block import CSPSPPF, BiC, RepStageBlock, ConvBnAct
+from yolo_duplicate.model.get_build_config import *
 
 class RepBiPan(nn.Module):
 

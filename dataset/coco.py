@@ -154,11 +154,13 @@ def collate_fn(batch):
     annos_list = []
     mask = []
     for anno in annos:
-        annos_list.append(F.pad(anno, (0, 0, 0, max_batch_box- anno.shape[0]), value=0))
+        annos_list.append(F.pad(anno, (0, 0, 0, max_batch_box - anno.shape[0]), value=0))
         mask.append(torch.tensor([1] * anno.shape[0] + [0] * (max_batch_box - anno.shape[0])))
     return (torch.stack(imgs, dim=0),
             torch.stack(annos_list, dim=0),
             torch.stack(mask, dim=0))
+
+
 def get_transform():
     return transforms.Compose([
         transforms.ToPILImage(),
@@ -168,12 +170,6 @@ def get_transform():
     ])
 
 
-if __name__ == '__main__':
-    coco = CocoDataset("/data/tx/coco", "coco.yml", train=False)
-    loader = DataLoader(coco, batch_size=10, shuffle=True, collate_fn=collate_fn)
-    for (img, annos, mask) in loader:
-        coco.draw_box(img[0], annos[0], mask[0])
-        coco.draw_box(img[1], annos[1], mask[1])
-        coco.draw_box(img[2], annos[2], mask[2])
-        coco.draw_box(img[3], annos[3], mask[3])
-        break
+def dataloader(batch_size, root_dir, yml_file, train=True):
+    coco = CocoDataset(root_dir, yml_file, train=train)
+    return DataLoader(coco, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)

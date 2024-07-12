@@ -8,7 +8,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from yolo.assigners import ATSSAssigner, TaskAlignedAssigner, generate_anchor
+from yolo_duplicate.assigners import ATSSAssigner, TaskAlignedAssigner, generate_anchor
+from yolo_duplicate.criterion.iou_loss import IOULoss
 
 
 class ComputeLoss(nn.Module):
@@ -27,7 +28,7 @@ class ComputeLoss(nn.Module):
         if loss_weight is None:
             loss_weight = {
                 "class": 1.0,
-                "box": 1.0
+                "box": 2.5
             }
         if feats_shape is None:
             feats_shape = [(80, 80), (40, 40), (20, 20)]
@@ -41,6 +42,10 @@ class ComputeLoss(nn.Module):
         if warmup_epoch > 0:
             self.atss_assigner = ATSSAssigner(topk=9, num_classes=num_classes)
         self.task_align_assigner = TaskAlignedAssigner(topk=13, num_classes=num_classes)
+
+        self.varifocal_loss = VarifocalLoss()
+
+        self.box_loss = BoxLoss(iou_type=iou_type)
 
     def forward(self, outputs, targets, mask_gt, epoch_num):
         # cls_pred (bs, num_total_anchors, num_classes)
@@ -80,6 +85,17 @@ class ComputeLoss(nn.Module):
 
         targets_boxes /= stride_tensor
 
+        label = F.one_hot(targets_labels.long(), self.num_classes + 1)[..., :-1]
+        # 分类损失
+        loss_cls = self.varifocal_loss(cls_pred, targets_scores, label)
+        # 除以应该正确预测的所有值的综合(被iou加权了的)
+        scores_sum = targets_scores.sum()
+        if scores_sum > 1:
+            loss_cls /= scores_sum
+        box_loss = self.box_loss(pred_boxes, targets_boxes, targets_scores, candidate_id)
+        loss = self.loss_weight["class"] * loss_cls + self.loss_weight["box"] * box_loss
+        return loss, torch.cat(self.loss_weight["class"] * loss_cls, self.loss_weight["box"] * box_loss)
+
     def box_decode(self, anchor_points, box_pred, stride_tensor):
         """
         解码预测框
@@ -96,7 +112,43 @@ class VarifocalLoss(nn.Module):
     """
     分类损失
     """
+
     def __init__(self):
         super(VarifocalLoss, self).__init__()
 
     def forward(self, pred_score, gt_score, label, alpha=0.75, gamma=2.0):
+        """
+        expression: VFL(p,q)=\left\{\begin{matrix}-q(qlog(p)+(1-q)log(1-p)),&q>0
+        \\-\alpha p^\gamma log(1-p),&q=0\end{matrix}\right
+        """
+        weight = alpha * pred_score.pow(gamma) * (1 - label) + gt_score * label
+        return (F.binary_cross_entropy(pred_score.float(), gt_score.float(), reduction="none") * weight).sum()
+
+
+class BoxLoss(nn.Module):
+
+    def __init__(self, iou_type='giou'):
+        super(BoxLoss, self).__init__()
+        self.iou_loss = IOULoss(box_format="xyxy", iou_type=iou_type, eps=1e-9)
+
+    def forward(self, pred_boxes, target_boxes, target_scores, mask):
+        num_pos = mask.sum()
+
+        if num_pos > 0:
+            # 展平
+            mask = mask.flatten()
+            pred_boxes = pred_boxes.reshape(-1, 4)
+            target_boxes = target_boxes.reshape(-1, 4)
+            box_weight = target_scores.sum(-1).flatten()
+            pred_boxes_pos = pred_boxes[mask, :]
+            target_boxes_pos = target_boxes[mask, :]
+            box_weight = target_scores[mask]
+            loss_box = self.iou_loss(pred_boxes_pos, target_boxes_pos) * box_weight
+            target_scores_sum = target_scores.sum()
+            if target_scores_sum > 1:
+                loss_box = loss_box.sum() / target_scores_sum
+            else:
+                loss_box = loss_box.sum()
+        else:
+            loss_box = torch.tensor(0.0).to(pred_boxes.device)
+        return loss_box

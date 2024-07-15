@@ -29,7 +29,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from torch.nn import functional as F
 
-from yolo.util.box_util import cxcywh2xyxy
+from yolo_duplicate.util.box_util import cxcywh2xyxy
 
 
 class CocoDataset(Dataset):
@@ -102,7 +102,8 @@ class CocoDataset(Dataset):
         plt.show()
 
     def __len__(self):
-        return len(self.img_name_list)
+        # return len(self.img_name_list)
+        return 1000
 
     def boxes_transform(self, boxes, ori_shape, img_shape):
         ret_box = []

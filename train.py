@@ -14,23 +14,39 @@ from torch.optim.lr_scheduler import StepLR
 from dataset import get_dataloader
 from util.config_util import load_yaml
 from model import YOLOV6
+from yolo_duplicate.criterion.loss import ComputeLoss
 
 
-def train_one_epoch(epoch, model, dataloader, optimizer, device):
-    pass
+def train_one_epoch(cfg, epoch, model, loss, dataloader, optimizer, device):
+    model.train()
+    t = tqdm(dataloader, desc=f"Epoch ({epoch}/{cfg.EPOCHS}) loss : 0.0")
+    for i, (images, annos, mask) in enumerate(t):
+        images = images.to(device)
+        annos = annos.to(device)
+        mask = mask.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        (loss, _, _) = loss(outputs, annos, mask, epoch)
+        loss.backward()
+        t.desc = f"Epoch ({epoch}/{cfg.EPOCHS}) loss : {loss.item():.2f}"
+        optimizer.step()
 
 
 def train(args):
     cfg = load_yaml(args.config)
-    dataloader = get_dataloader(cfg, cfg.DATASET_FILE, True)
+    dataloader = get_dataloader(cfg, train=True)
+    test_dataloader = get_dataloader(cfg, train=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    compute_loss = ComputeLoss()
     model = YOLOV6().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.LR)
     schedule_lr = StepLR(optimizer, step_size=cfg.STEP_SIZE, gamma=cfg.GAMMA)
     epoch = 0
 
-    logfile = os.path.join(cfg.CHECKPOINT_DIR, f"{cfg.EXPRIMENT_NAME}_{datetime.now().strftime('%Y%m%d%H%M')}.log")
+    os.makedirs(cfg.CHECKPOINT_DIR, exist_ok=True)
+    logfile = os.path.join(cfg.CHECKPOINT_DIR, f"{cfg.EXPERIMENT_NAME}_{datetime.now().strftime('%Y%m%d%H%M')}.log")
     if cfg.RESUME:
         checkpoint = torch.load(cfg.CHECKPOINT)
         model.load_state_dict(checkpoint["model"])
@@ -41,8 +57,7 @@ def train(args):
 
     best_accuracy = 0
     for epoch in range(epoch, cfg.EPOCHS):
-        model.train()
-        train_one_epoch(epoch, model, dataloader, optimizer, device)
+        train_one_epoch(cfg, epoch, model, compute_loss, dataloader, optimizer, device)
         schedule_lr.step()
 
         if epoch % cfg.SAVE_INTERVAL == 0:
@@ -56,22 +71,28 @@ def train(args):
             torch.save(model.state_dict(), os.path.join(cfg.CHECKPOINT_DIR, f"model_{epoch}.pt"))
             del checkpoint
 
-            accuracy = compute_accuracy(model, dataloader, device)
+            accuracy = compute_accuracy(model, test_dataloader, device)
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
             print(f"Epoch {epoch}, accuracy: {accuracy}, best accuracy: {best_accuracy}")
 
 
-
-
+@torch.no_grad()
 def compute_accuracy(model, test_dataloader, device):
-    pass
+    return 0.0
+    model.eval()
+    t = tqdm(test_dataloader, desc="acc : 0.0")
+    for i, (images, annos, mask) in enumerate(t):
+        images = images.to(device)
+        annos = annos.to(device)
+        mask = mask.to(device)
 
+        outputs = model(images)
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Train YOLOV6")
-    parser.add_argument("--config", type=str, default="config.yaml", help="path to config file")
+    parser.add_argument("--config", type=str, default="config/yolo6n.yaml", help="path to config file")
     args = parser.parse_args()
     train(args)
     print("training process finished")

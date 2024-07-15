@@ -5,8 +5,8 @@
 """
 
 import yaml
-
+from easydict import EasyDict as edict
 
 def load_yaml(path):
     with open(path, 'r') as f:
-        return yaml.load(f, Loader=yaml.FullLoader)
+        return edict(yaml.load(f, Loader=yaml.FullLoader))

@@ -15,7 +15,7 @@ __all__ = ["get_dataloader"]
 datasets = ["coco"]
 
 
-def get_dataloader(cfg, yml_file, train=True, dataset="coco"):
+def get_dataloader(cfg, yml_file="./dataset/coco.yml", train=True, dataset="coco"):
     if dataset not in datasets:
         raise ValueError(f"dataset {dataset} not supported")
     if dataset == "coco":

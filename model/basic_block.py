@@ -43,6 +43,7 @@ class RepVGGBlock(nn.Module):
             self.blocks.append(block3)
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU(inplace=True)
+        self.blocks = nn.Sequential(*self.blocks)
 
     def forward(self, x):
         for i, block in enumerate(self.blocks):

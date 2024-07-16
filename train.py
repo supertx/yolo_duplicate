@@ -40,8 +40,9 @@ def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     compute_loss = ComputeLoss()
-    model = YOLOV6().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.LR)
+    model = YOLOV6()
+    model.to(device)
+    optimizer = torch.optim.Adam(model.get_learnable_parameter(), lr=cfg.LR)
     schedule_lr = StepLR(optimizer, step_size=cfg.STEP_SIZE, gamma=cfg.GAMMA)
     epoch = 0
 

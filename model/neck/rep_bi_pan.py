@@ -11,6 +11,7 @@ import torch.nn as nn
 from yolo_duplicate.model.basic_block import CSPSPPF, BiC, RepStageBlock, ConvBnAct
 from yolo_duplicate.model.get_build_config import *
 
+
 class RepBiPan(nn.Module):
 
     def __init__(self):
@@ -28,6 +29,21 @@ class RepBiPan(nn.Module):
         self.blk3 = RepStageBlock(build_lst[4] * 2, build_lst[4], num_repeats[2], 1)
         self.conv4 = ConvBnAct(build_lst[4], build_lst[4], 3, stride=2, padding=1)
         self.blk4 = RepStageBlock(build_lst[5], build_lst[5], num_repeats[3], 1)
+        self.apply(self._init_weight)
+
+    @staticmethod
+    def _init_weight(module):
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        if isinstance(module, nn.BatchNorm2d):
+            nn.init.constant_(module.weight, 1)
+            nn.init.constant_(module.bias, 0)
+
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, 0, 0.01)
+            nn.init.constant_(module.bias, 0)
 
     def forward(self, c2, c3, c4, c5):
         p5 = self.cspsppf(c5)
@@ -44,7 +60,6 @@ class RepBiPan(nn.Module):
         n5 = self.conv4(n4)
         n5 = self.blk4(torch.concat([n5, p5], dim=1))
         return n3, n4, n5
-
 
 
 if __name__ == '__main__':

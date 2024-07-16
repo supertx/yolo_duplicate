@@ -62,6 +62,22 @@ class DecoupleHead(nn.Module):
                                   padding=1, activation="silu"))
         blk3_cls.append(nn.Conv2d(build_lst[2], num_class, 1))
         self.blk3_cls = nn.Sequential(*blk3_cls)
+        self.apply(self._init_weight)
+
+
+    @staticmethod
+    def _init_weight(module):
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        if isinstance(module, nn.BatchNorm2d):
+            nn.init.constant_(module.weight, 1)
+            nn.init.constant_(module.bias, 0)
+
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, 0, 0.01)
+            nn.init.constant_(module.bias, 0)
 
     def forward(self, p5, p4, p3):
         p3 = self.stem1(p3)

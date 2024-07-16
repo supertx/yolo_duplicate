@@ -6,7 +6,7 @@ ATSS_assigner
 import torch
 from torch import nn
 from torch.nn import functional as F
-from yolo.util.box_util import iou_calculator, dist_calculator, select_candidates_in_gts
+from yolo_duplicate.util.box_util import iou_calculator, dist_calculator, select_candidates_in_gts
 
 
 class ATSSAssigner(nn.Module):
@@ -29,7 +29,7 @@ class ATSSAssigner(nn.Module):
         self.n_anchors = anc_bboxes.size(0)
         self.bs = gt_bboxes.size(0)
         self.n_max_boxes = gt_bboxes.size(1)
-
+        mask_gt = mask_gt.unsqueeze(-1).repeat(1, 1, self.n_anchors)
         overlaps = iou_calculator(anc_bboxes, gt_bboxes.reshape([-1, 4]))
         distance = dist_calculator(anc_bboxes, gt_bboxes.reshape([-1, 4]))
         overlaps = overlaps.reshape(self.bs, self.n_max_boxes, self.n_anchors)
@@ -89,11 +89,11 @@ class ATSSAssigner(nn.Module):
         idx = target_gt_idx.permute(0, 2, 1)
         mask = idx.sum(-1) > 0
         target_labels = torch.where(mask, gt_labels[
-            torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).flatten(0), idx.argmax(-1).flatten(0)].reshape(
-            self.bs, self.n_anchors), torch.full(mask.shape, self.bg_idx))
+            torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).flatten(0).to(mask.device), idx.argmax(-1).flatten(0)].reshape(
+            self.bs, self.n_anchors), torch.full(mask.shape, self.bg_idx).to(mask.device))
 
         # assigned target boxes
-        target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors) * self.n_max_boxes
+        target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).to(idx.device) * self.n_max_boxes
         target_boxes = gt_boxes.reshape([-1, 4])[target_idx]
         # assigned target scores
         target_scores = F.one_hot(target_labels, self.num_classes + 1).float()

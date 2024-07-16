@@ -52,9 +52,10 @@ class ComputeLoss(nn.Module):
         # box_pred (bs, num_total_anchors, 4)
         cls_pred, box_pred = outputs
 
-        anchors, anchor_points, num_anchors_list, stride_tensor = generate_anchor(self.img_size, self.fpn_strides)
+        anchors, anchor_points, num_anchors_list, stride_tensor = \
+            generate_anchor(self.img_size, self.fpn_strides, device="cuda")
         batch_size = cls_pred.size(0)
-        targets = self.preprocess(targets, batch_size)
+        # targets = self.preprocess(targets, batch_size)
         gt_labels = targets[:, :, 0]
         gt_boxes = targets[:, :, 1:]
 

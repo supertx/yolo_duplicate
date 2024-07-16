@@ -30,6 +30,7 @@ def generate_anchor(img_size: (tuple, int), strides, grid_cell_size=5.0, grid_ce
     anchors = torch.cat(anchors)
     anchor_points = torch.cat(anchor_points)
     stride_tensor = torch.cat(stride_tensor)
+    num_anchors_list = torch.tensor(num_anchors_list)
     return anchors, anchor_points, num_anchors_list, stride_tensor
 
 

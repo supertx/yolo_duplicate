@@ -76,7 +76,7 @@ class CocoDataset(Dataset):
         boxes = self.boxes_transform(annos[1][:, 1:], img.shape, (640, 640))
         annos[1][:, 1:] = boxes
         img = self.transform(img)
-        return img, torch.tensor(annos[1])
+        return img, torch.tensor(annos[1], dtype=torch.float32)
 
     def draw_box(self, img, annos, mask):
         if isinstance(img, torch.Tensor):

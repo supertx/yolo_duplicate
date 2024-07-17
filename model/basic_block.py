@@ -8,11 +8,11 @@ from torch import nn
 
 def get_activation(activation):
     if activation == 'relu':
-        return nn.ReLU(inplace=True)
+        return nn.ReLU()
     elif activation == 'leaky':
-        return nn.LeakyReLU(0.1, inplace=True)
+        return nn.LeakyReLU(0.1)
     elif activation == 'silu':
-        return nn.SiLU(inplace=True)
+        return nn.SiLU()
     else:
         raise ValueError(f"Unknown activation: {activation}")
 
@@ -42,15 +42,26 @@ class RepVGGBlock(nn.Module):
             block3 = nn.Identity()
             self.blocks.append(block3)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.activation = nn.ReLU(inplace=True)
+        self.activation = nn.ReLU()
         self.blocks = nn.Sequential(*self.blocks)
 
     def forward(self, x):
+        """
+        for i, block in enumerate(self.blocks):
+            if i == 0:
+                y = block(x)
+            if i == 1:
+                y1 = y + block(x)
+            if i == 2:
+                y2 = y1 + block(x)
+        return self.activation(y1) if i == 1 else self.activation(y2)
+        """
+        y = x.clone()
         for i, block in enumerate(self.blocks):
             if i == 0:
                 y = block(x)
             else:
-                y += block(x)
+                y = y + block(x)
         return self.activation(y)
 
 

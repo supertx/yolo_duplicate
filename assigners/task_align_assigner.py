@@ -48,6 +48,7 @@ class TaskAlignedAssigner(nn.Module):
             in_gts.append(in_gt)
         in_gts = torch.stack(in_gts, dim=0)
         # select topk candidates
+        mask_gt = mask_gt.unsqueeze(-1).repeat(1, 1, self.n_anchors)
         alignment_metric = in_gts * alignment_metric * mask_gt
         _, indices = alignment_metric.topk(self.topk, dim=-1)
         candidate_id = F.one_hot(indices, num_classes=self.n_anchors).sum(-2)
@@ -75,13 +76,13 @@ class TaskAlignedAssigner(nn.Module):
         mask = idx.sum(-1) > 0
         target_labels = torch.where(mask, gt_labels[
             torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).flatten(0), idx.argmax(-1).flatten(0)].reshape(
-            self.bs, self.n_anchors), torch.full(mask.shape, self.bg_idx))
+            self.bs, self.n_anchors).to(mask.device), torch.full(mask.shape, self.bg_idx, device=mask.device))
 
         # assigned target boxes
-        target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors) * self.n_max_boxes
+        target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).to(idx) * self.n_max_boxes
         target_boxes = gt_boxes.reshape([-1, 4])[target_idx]
         # assigned target scores
-        target_scores = F.one_hot(target_labels, self.num_classes + 1).float()
+        target_scores = F.one_hot(target_labels.long(), self.num_classes + 1).float()
         target_scores = target_scores[:, :, :self.num_classes]
         return target_labels, target_boxes, target_scores, mask
 

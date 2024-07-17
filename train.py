@@ -27,9 +27,9 @@ def train_one_epoch(cfg, epoch, model, loss, dataloader, optimizer, device):
 
         optimizer.zero_grad()
         outputs = model(images)
-        (loss, _, _) = loss(outputs, annos, mask, epoch)
-        loss.backward()
-        t.desc = f"Epoch ({epoch}/{cfg.EPOCHS}) loss : {loss.item():.2f}"
+        (l, _, _) = loss(outputs, annos, mask, epoch)
+        l.backward()
+        t.desc = f"Epoch ({epoch}/{cfg.EPOCHS}) loss : {l.item():.2f}"
         optimizer.step()
 
 
@@ -39,7 +39,7 @@ def train(args):
     test_dataloader = get_dataloader(cfg, train=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    compute_loss = ComputeLoss()
+    compute_loss = ComputeLoss(warmup_epoch=cfg.WARMUP_EPOCH)
     model = YOLOV6()
     model.to(device)
     optimizer = torch.optim.Adam(model.get_learnable_parameter(), lr=cfg.LR)

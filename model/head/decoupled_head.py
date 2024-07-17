@@ -87,14 +87,17 @@ class DecoupleHead(nn.Module):
         box1 = self.blk1_box(p3)
         box1 = box1.flatten(2).permute(0, 2, 1)
         cls1 = self.blk1_cls(p3)
+        cls1 = torch.sigmoid(cls1)
         cls1 = cls1.flatten(2).permute(0, 2, 1)
         box2 = self.blk2_box(p4)
         box2 = box2.flatten(2).permute(0, 2, 1)
         cls2 = self.blk2_cls(p4)
+        cls2 = torch.sigmoid(cls2)
         cls2 = cls2.flatten(2).permute(0, 2, 1)
         box3 = self.blk3_box(p5)
         box3 = box3.flatten(2).permute(0, 2, 1)
         cls3 = self.blk3_cls(p5)
+        cls3 = torch.sigmoid(cls3)
         cls3 = cls3.flatten(2).permute(0, 2, 1)
 
         return (torch.cat([cls1, cls2, cls3], dim=1),

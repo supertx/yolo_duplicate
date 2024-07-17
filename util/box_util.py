@@ -82,6 +82,7 @@ def select_candidates_in_gts(anchor_boxes, gt_boxes, eps=1e-9):
     """
     select the positive anchors center in gt
     """
+    # TODO 这里有问题,大概
     ac_boxes_center = torch.stack([(anchor_boxes[:, 0] + anchor_boxes[:, 2]) / 2,
                                    (anchor_boxes[:, 1] + anchor_boxes[:, 3]) / 2], dim=1)
     bs = 0

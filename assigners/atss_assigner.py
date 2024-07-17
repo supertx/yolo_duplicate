@@ -37,19 +37,19 @@ class ATSSAssigner(nn.Module):
         candidate_id, candidate_counts = self.select_topk_candidates(distance, overlaps, n_level_bboxes, mask_gt)
         # candidate anchor box center should be in gt box
         is_in_gts = select_candidates_in_gts(anc_bboxes, gt_bboxes)
-        candidate_id = is_in_gts * candidate_id * mask_gt
+        candidate_id =  candidate_id * mask_gt
+        # print(candidate_id.sum())
 
         target_labels, target_boxes, target_scores, mask_gt = self.get_targets(gt_labels, gt_bboxes, candidate_id)
-
         # soft label with iou
         if pd_boxes is not None:
             iou = []
             for i in range(self.bs):
-                iou.append(iou_calculator(pd_boxes[i], target_boxes[i]))
+                iou.append(iou_calculator(pd_boxes[i], gt_bboxes[i]))
             iou = torch.stack(iou, dim=0)
-            iou = iou.permute(0, 2, 1).max(-1)[0].squeeze(-1) * mask_gt
-            target_scores = iou.unsqueeze(-1) * target_scores
-
+            iou = iou.max(-1)[0].squeeze(-1) * mask_gt
+            target_scores = iou.unsqueeze(-1).repeat(1, 1, self.num_classes) * target_scores
+        # target_scores = torch.abs(target_scores)
         return target_labels, target_boxes, target_scores, mask_gt
 
     def select_topk_candidates(self, distances, overlaps, n_level_bboxes, mask_gt):
@@ -63,6 +63,7 @@ class ATSSAssigner(nn.Module):
             start_idx += level_counts
         indices = torch.cat(indices_lst, dim=-1)
         candidate_id = F.one_hot(indices, num_classes=n_level_bboxes.sum()).sum(-2)
+        # print(candidate_id.sum())
         """
         official implement have make a emit for a anchor_box matching multiple gt_boxes first, and select these omitted
          anchor_box after calculate iou condition(select the highest iou with gt).
@@ -82,6 +83,7 @@ class ATSSAssigner(nn.Module):
         candidate_id = torch.where(overlaps > (avg_iou + std_iou).unsqueeze(2).repeat(1, 1, self.n_anchors),
                                    candidate_id,
                                    torch.zeros_like(candidate_id))
+        # print(candidate_id.sum())
         return candidate_id, candidate_id.sum(1)
 
     def get_targets(self, gt_labels, gt_boxes, target_gt_idx):
@@ -96,7 +98,7 @@ class ATSSAssigner(nn.Module):
         target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).to(idx.device) * self.n_max_boxes
         target_boxes = gt_boxes.reshape([-1, 4])[target_idx]
         # assigned target scores
-        target_scores = F.one_hot(target_labels, self.num_classes + 1).float()
+        target_scores = F.one_hot(target_labels.long(), self.num_classes + 1).float()
         target_scores = target_scores[:, :, :self.num_classes]
         return target_labels, target_boxes, target_scores, mask
 

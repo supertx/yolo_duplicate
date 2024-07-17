@@ -87,15 +87,19 @@ class ComputeLoss(nn.Module):
         targets_boxes /= stride_tensor
 
         label = F.one_hot(targets_labels.long(), self.num_classes + 1)[..., :-1]
-        # 分类损失
-        loss_cls = self.varifocal_loss(cls_pred, targets_scores, label)
-        # 除以应该正确预测的所有值的综合(被iou加权了的)
+
         scores_sum = targets_scores.sum()
+        if scores_sum > 0:
+        # 分类损失
+            loss_cls = self.varifocal_loss(cls_pred, targets_scores, label)
+        else:
+            loss_cls = 0
+        # 除以应该正确预测的所有值的综合(被iou加权了的)
         if scores_sum > 1:
             loss_cls /= scores_sum
         box_loss = self.box_loss(pred_boxes, targets_boxes, targets_scores, candidate_id)
         loss = self.loss_weight["class"] * loss_cls + self.loss_weight["box"] * box_loss
-        return loss, torch.cat(self.loss_weight["class"] * loss_cls, self.loss_weight["box"] * box_loss)
+        return loss, self.loss_weight["class"] * loss_cls, self.loss_weight["box"] * box_loss
 
     def box_decode(self, anchor_points, box_pred, stride_tensor):
         """
@@ -123,7 +127,7 @@ class VarifocalLoss(nn.Module):
         \\-\alpha p^\gamma log(1-p),&q=0\end{matrix}\right
         """
         weight = alpha * pred_score.pow(gamma) * (1 - label) + gt_score * label
-        return (F.binary_cross_entropy(pred_score.float(), gt_score.float(), reduction="none") * weight).sum()
+        return (F.binary_cross_entropy(pred_score, gt_score.to(pred_score), reduction="none") * weight).sum()
 
 
 class BoxLoss(nn.Module):
@@ -140,7 +144,7 @@ class BoxLoss(nn.Module):
             mask = mask.flatten()
             pred_boxes = pred_boxes.reshape(-1, 4)
             target_boxes = target_boxes.reshape(-1, 4)
-            box_weight = target_scores.sum(-1).flatten()
+            target_scores = target_scores.sum(-1).flatten()
             pred_boxes_pos = pred_boxes[mask, :]
             target_boxes_pos = target_boxes[mask, :]
             box_weight = target_scores[mask]

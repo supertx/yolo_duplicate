@@ -32,8 +32,8 @@ class IOULoss:
             b2_x1, b2_y1, b2_w, b2_h = torch.split(boxes2, 1, dim=-1)
             b1_x2, b1_y2 = b1_x1 + b1_w, b1_y1 + b1_h
             b2_x2, b2_y2 = b2_x1 + b2_w, b2_y1 + b2_h
-        inter_area = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)) * \
-                     (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1))
+        inter_area = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
+                     (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
         w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + self.eps
         w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + self.eps
         union_area = w1 * h1 + w2 * h2 - inter_area

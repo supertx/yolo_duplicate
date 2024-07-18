@@ -13,7 +13,7 @@ def cxcywh2xyxy(boxes):
             [boxes[0] - boxes[2] / 2, boxes[1] - boxes[3] / 2, boxes[0] + boxes[2] / 2, boxes[1] + boxes[3] / 2])
     ret = []
     for i, box in enumerate(boxes):
-        ret.append([box[0], box[1], box[0] + box[2], box[1] + box[3]])
+        ret.append([box[0] - box[2] / 2, box[1] - box[3] / 2, box[0] + box[2] / 2, box[1] + box[3] / 2])
     return np.array(ret)
 
 
@@ -83,23 +83,14 @@ def select_candidates_in_gts(anchor_boxes, gt_boxes, eps=1e-9):
     select the positive anchors center in gt
     """
     # TODO 这里有问题,大概
-    ac_boxes_center = torch.stack([(anchor_boxes[:, 0] + anchor_boxes[:, 2]) / 2,
-                                   (anchor_boxes[:, 1] + anchor_boxes[:, 3]) / 2], dim=1)
-    bs = 0
-    if len(gt_boxes.shape) == 2:
-        n_max_boxes = gt_boxes.size(0)
-    else:
-        bs, n_max_boxes, _ = gt_boxes.shape
-    ac_boxes_center.repeat(1, n_max_boxes, 1)
-    ac_boxes_center = ac_boxes_center.reshape(-1, 2)
+    ac_boxes_center = torch.stack([(anchor_boxes[..., 0] + anchor_boxes[..., 2]) / 2,
+                                   (anchor_boxes[..., 1] + anchor_boxes[..., 3]) / 2], dim=1)
+    n_max_boxes = gt_boxes.size(0)
+    ac_boxes_center.unsqueeze(0).repeat(n_max_boxes, 1, 1)
     gt_boxes = gt_boxes.reshape(-1, 4)
     gt_boxes_lt = gt_boxes[:, :2].unsqueeze(1).repeat(1, anchor_boxes.size(0), 1)
     gt_boxes_rb = gt_boxes[:, 2:].unsqueeze(1).repeat(1, anchor_boxes.size(0), 1)
     b_lt = ac_boxes_center - gt_boxes_lt
     b_rb = gt_boxes_rb - ac_boxes_center
     bbox_deltas = torch.cat([b_lt, b_rb], dim=-1)
-    if bs == 0:
-        return bbox_deltas.min(dim=-1)[0] > eps
-    else:
-        bbox_deltas = bbox_deltas.reshape(bs, n_max_boxes, anchor_boxes.size(0), -1)
     return bbox_deltas.min(dim=-1)[0] > eps

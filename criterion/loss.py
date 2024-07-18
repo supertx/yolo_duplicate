@@ -90,7 +90,7 @@ class ComputeLoss(nn.Module):
 
         scores_sum = targets_scores.sum()
         if scores_sum > 0:
-        # 分类损失
+            # 分类损失
             loss_cls = self.varifocal_loss(cls_pred, targets_scores, label)
         else:
             loss_cls = 0
@@ -105,8 +105,9 @@ class ComputeLoss(nn.Module):
         """
         解码预测框
         """
-        box_pred = torch.cat([box_pred[..., :2] +
-                              anchor_points.unsqueeze(0).repeat(box_pred.size(0), 1, 1),
+
+        box_pred = torch.cat([anchor_points.unsqueeze(0).repeat(box_pred.size(0), 1, 1)
+                              - box_pred[..., :2],
                               box_pred[..., 2:] +
                               anchor_points.unsqueeze(0).repeat(box_pred.size(0), 1, 1)], dim=-1)
         box_pred = box_pred * stride_tensor

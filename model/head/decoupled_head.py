@@ -14,6 +14,7 @@ class DecoupleHead(nn.Module):
 
     def __init__(self, num_class=80, ):
         super(DecoupleHead, self).__init__()
+        self.prior_prob = 1e-2
         build_lst = get_decouple_head_build_lst()
         self.stem1 = ConvBnAct(build_lst[0], build_lst[0],
                                kernel_size=1, stride=1,
@@ -37,47 +38,57 @@ class DecoupleHead(nn.Module):
                                   padding=1, activation="silu"))
         blk1_box.append(nn.Conv2d(build_lst[0], 4, 1))
         self.blk1_box = nn.Sequential(*blk1_box)
+        self.blk1_box.apply(self.initialize_box_biases)
         blk1_cls.append(ConvBnAct(build_lst[0], build_lst[0],
                                   kernel_size=3, stride=1,
                                   padding=1, activation="silu"))
         blk1_cls.append(nn.Conv2d(build_lst[0], num_class, 1))
         self.blk1_cls = nn.Sequential(*blk1_cls)
+        self.blk1_cls.apply(self.initialize_cls_biases)
         blk2_box.append(ConvBnAct(build_lst[1], build_lst[1],
                                   kernel_size=3, stride=1,
                                   padding=1, activation="silu"))
         blk2_box.append(nn.Conv2d(build_lst[1], 4, 1))
         self.blk2_box = nn.Sequential(*blk2_box)
+        self.blk2_box.apply(self.initialize_box_biases)
         blk2_cls.append(ConvBnAct(build_lst[1], build_lst[1],
                                   kernel_size=3, stride=1,
                                   padding=1, activation="silu"))
         blk2_cls.append(nn.Conv2d(build_lst[1], num_class, 1))
         self.blk2_cls = nn.Sequential(*blk2_cls)
+        self.blk2_cls.apply(self.initialize_cls_biases)
         blk3_box.append(ConvBnAct(build_lst[2], build_lst[2],
                                   kernel_size=3, stride=1,
                                   padding=1, activation="silu"))
         blk3_box.append(nn.Conv2d(build_lst[2], 4, 1))
         self.blk3_box = nn.Sequential(*blk3_box)
+        self.blk3_box.apply(self.initialize_box_biases)
         blk3_cls.append(ConvBnAct(build_lst[2], build_lst[2],
                                   kernel_size=3, stride=1,
                                   padding=1, activation="silu"))
         blk3_cls.append(nn.Conv2d(build_lst[2], num_class, 1))
         self.blk3_cls = nn.Sequential(*blk3_cls)
-        self.apply(self._init_weight)
+        self.blk3_cls.apply(self.initialize_cls_biases)
 
+    def initialize_cls_biases(self, conv):
+        if isinstance(conv, nn.Conv2d):
+            b = conv.bias.view(-1, )
+            b.data.fill_(-math.log((1 - self.prior_prob) / self.prior_prob))
+            conv.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
+            w = conv.weight
+            w.data.fill_(0.)
+            conv.weight = torch.nn.Parameter(w, requires_grad=True)
 
     @staticmethod
-    def _init_weight(module):
-        if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
-            if module.bias is not None:
-                nn.init.constant_(module.bias, 0)
-        if isinstance(module, nn.BatchNorm2d):
-            nn.init.constant_(module.weight, 1)
-            nn.init.constant_(module.bias, 0)
+    def initialize_box_biases(conv):
+        if isinstance(conv, nn.Conv2d):
+            b = conv.bias.view(-1, )
+            b.data.fill_(1.0)
+            conv.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
+            w = conv.weight
+            w.data.fill_(0.)
+            conv.weight = torch.nn.Parameter(w, requires_grad=True)
 
-        if isinstance(module, nn.Linear):
-            nn.init.normal_(module.weight, 0, 0.01)
-            nn.init.constant_(module.bias, 0)
 
     def forward(self, p5, p4, p3):
         p3 = self.stem1(p3)

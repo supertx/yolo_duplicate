@@ -19,7 +19,7 @@ from yolo_duplicate.criterion.loss import ComputeLoss
 
 def train_one_epoch(cfg, epoch, model, loss, dataloader, optimizer, device):
     model.train()
-    t = tqdm(dataloader, desc=f"Epoch ({epoch}/{cfg.EPOCHS}) loss : 0.0")
+    t = tqdm(dataloader, desc=f"Epoch ({epoch}/{cfg.EPOCHS}) loss : 0.0", ncols=150)
     for i, (images, annos, mask) in enumerate(t):
         images = images.to(device)
         annos = annos.to(device)
@@ -27,9 +27,9 @@ def train_one_epoch(cfg, epoch, model, loss, dataloader, optimizer, device):
 
         optimizer.zero_grad()
         outputs = model(images)
-        (l, _, _) = loss(outputs, annos, mask, epoch)
+        (l, cls_l, iou_l) = loss(outputs, annos, mask, epoch)
         l.backward()
-        t.desc = f"Epoch ({epoch}/{cfg.EPOCHS}) loss : {l.item():.2f}"
+        t.desc = f"Epoch ({epoch}/{cfg.EPOCHS}) loss : {l.item():.2f} cls_loss : {cls_l.item():.2f} iou_loss : {iou_l.item():.2f}"
         optimizer.step()
 
 

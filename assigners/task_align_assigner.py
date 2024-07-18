@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from yolo.util.box_util import iou_calculator, select_candidates_in_gts
+from yolo_duplicate.util.box_util import iou_calculator, select_candidates_in_gts
 
 
 class TaskAlignedAssigner(nn.Module):
@@ -39,9 +39,14 @@ class TaskAlignedAssigner(nn.Module):
             overlap = iou_calculator(gt_boxes[i], pd_boxes[i])
             overlaps.append(overlap)
         overlaps = torch.stack(overlaps, dim=0)
-        pd_scores = pd_scores.argmax(-1).squeeze(-1)
-        pd_scores = pd_scores.unsqueeze(1).repeat(1, self.n_max_boxes, 1)
-        alignment_metric = pd_scores.pow(self.alpha) * overlaps.pow(self.beta)
+        pd_scores = pd_scores.permute(0, 2, 1)
+        ind = torch.zeros([2, self.bs, self.n_max_boxes], dtype=torch.long)
+        ind[0] = torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_max_boxes)
+        ind[1] = gt_labels.long().squeeze(-1)
+        # box_scores (bs, n_max_boxes, num_total_anchors `)
+        box_scores = pd_scores[ind[0], ind[1]]
+
+        alignment_metric = box_scores.pow(self.alpha) * overlaps.pow(self.beta)
         in_gts = []
         for i in range(self.bs):
             in_gt = select_candidates_in_gts(pd_boxes[i], gt_boxes[i])
@@ -52,6 +57,7 @@ class TaskAlignedAssigner(nn.Module):
         alignment_metric = in_gts * alignment_metric * mask_gt
         _, indices = alignment_metric.topk(self.topk, dim=-1)
         candidate_id = F.one_hot(indices, num_classes=self.n_anchors).sum(-2)
+        candidate_id = candidate_id * mask_gt
         # solve the problem of multiple gt_boxes matching the same anchor_box
         multi_gt_match = candidate_id.sum(-2) > 1
         multi_gt_match = multi_gt_match.unsqueeze(dim=1)

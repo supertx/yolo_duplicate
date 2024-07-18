@@ -74,11 +74,12 @@ class CocoDataset(Dataset):
             # 随机仿射变换
             pass
         boxes = self.boxes_transform(annos[1][:, 1:], img.shape, (640, 640))
+        boxes = cxcywh2xyxy(boxes)
         annos[1][:, 1:] = boxes
         img = self.transform(img)
         return img, torch.tensor(annos[1], dtype=torch.float32)
 
-    def draw_box(self, img, annos, mask):
+    def draw_box(self, img, annos, mask, mode="xyxy"):
         if isinstance(img, torch.Tensor):
             img = img.detach().numpy().transpose(1, 2, 0)
             img = img * 255
@@ -93,7 +94,8 @@ class CocoDataset(Dataset):
                 anno = anno.numpy()
             box = anno[1:5]
             cls = anno[0].astype(np.int32)
-            box = cxcywh2xyxy(box)
+            if mode == "cxcywh":
+                box = cxcywh2xyxy(box)
             box = box.astype(np.int32)
             cv.rectangle(img, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
             cv.putText(img, self.class_names[cls], (box[0], box[1] - 10 if box[1] > 10 else 10),
@@ -103,7 +105,7 @@ class CocoDataset(Dataset):
 
     def __len__(self):
         # return len(self.img_name_list)
-        return 1000
+        return 10000
 
     def boxes_transform(self, boxes, ori_shape, img_shape):
         ret_box = []
@@ -173,4 +175,13 @@ def get_transform():
 
 def dataloader(batch_size, root_dir, yml_file, train=True):
     coco = CocoDataset(root_dir, yml_file, train=train)
-    return DataLoader(coco, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    return DataLoader(coco, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
+
+
+if __name__ == '__main__':
+    coco = CocoDataset("/data/tx/coco", "./coco.yml", train=False)
+    loader = DataLoader(coco, batch_size=2, shuffle=True, collate_fn=collate_fn, drop_last=True)
+    for imgs, annos, masks in loader:
+        for img, anno, masks in zip(imgs, annos, masks):
+            coco.draw_box(img, anno, masks)
+        break

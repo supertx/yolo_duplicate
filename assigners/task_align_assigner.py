@@ -54,10 +54,10 @@ class TaskAlignedAssigner(nn.Module):
         in_gts = torch.stack(in_gts, dim=0)
         # select topk candidates
         mask_gt = mask_gt.unsqueeze(-1).repeat(1, 1, self.n_anchors)
-        alignment_metric = in_gts * alignment_metric * mask_gt
         _, indices = alignment_metric.topk(self.topk, dim=-1)
+
         candidate_id = F.one_hot(indices, num_classes=self.n_anchors).sum(-2)
-        candidate_id = candidate_id * mask_gt
+        candidate_id = candidate_id * mask_gt * in_gts
         # solve the problem of multiple gt_boxes matching the same anchor_box
         multi_gt_match = candidate_id.sum(-2) > 1
         multi_gt_match = multi_gt_match.unsqueeze(dim=1)
@@ -81,12 +81,12 @@ class TaskAlignedAssigner(nn.Module):
         idx = candidate_id.permute(0, 2, 1)
         mask = idx.sum(-1) > 0
         target_labels = torch.where(mask, gt_labels[
-            torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).flatten(0), idx.argmax(-1).flatten(0)].reshape(
-            self.bs, self.n_anchors).to(mask.device), torch.full(mask.shape, self.bg_idx, device=mask.device))
+            torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors), idx.argmax(-1)].to(mask.device),
+                                    torch.full(mask.shape, self.bg_idx, device=mask.device))
 
         # assigned target boxes
-        target_idx = idx.argmax(-1).squeeze() + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).to(idx) * self.n_max_boxes
-        target_boxes = gt_boxes.reshape([-1, 4])[target_idx]
+        target_idx = idx.argmax(-1) + torch.arange(self.bs).unsqueeze(1).repeat(1, self.n_anchors).to(idx) * self.n_max_boxes
+        target_boxes = gt_boxes.reshape([-1, 4])[target_idx, :]
         # assigned target scores
         target_scores = F.one_hot(target_labels.long(), self.num_classes + 1).float()
         target_scores = target_scores[:, :, :self.num_classes]

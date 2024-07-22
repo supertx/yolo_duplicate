@@ -33,7 +33,6 @@ class ComputeLoss(nn.Module):
         if feats_shape is None:
             feats_shape = [(80, 80), (40, 40), (20, 20)]
         self.img_size = img_size
-        self.fpn_strides = fpn_strides
         self.num_classes = num_classes
         self.warmup_epoch = warmup_epoch
         self.iou_type = iou_type
@@ -75,7 +74,7 @@ class ComputeLoss(nn.Module):
         else:
             target_labels, target_boxes, target_scores, candidate_id = \
                 self.task_align_assigner(cls_pred,
-                                         pred_boxes,
+                                         pred_boxes * stride_tensor,
                                          gt_labels,
                                          gt_boxes,
                                          mask_gt)
@@ -110,7 +109,6 @@ class ComputeLoss(nn.Module):
                               - box_pred[..., :2],
                               box_pred[..., 2:] +
                               anchor_points.unsqueeze(0).repeat(box_pred.size(0), 1, 1)], dim=-1)
-        box_pred = box_pred * stride_tensor
         return box_pred
 
 
@@ -146,10 +144,11 @@ class BoxLoss(nn.Module):
             pred_boxes = pred_boxes.reshape(-1, 4)
             target_boxes = target_boxes.reshape(-1, 4)
             target_scores = target_scores.sum(-1).flatten()
+            # TODO 预测的box和目标的box对应不起来
             pred_boxes_pos = pred_boxes[mask, :]
             target_boxes_pos = target_boxes[mask, :]
             box_weight = target_scores[mask]
-            loss_box = self.iou_loss(pred_boxes_pos, target_boxes_pos) * box_weight
+            loss_box = self.iou_loss(pred_boxes_pos, target_boxes_pos).squeeze(-1) * box_weight
             target_scores_sum = target_scores.sum()
             if target_scores_sum > 1:
                 loss_box = loss_box.sum() / target_scores_sum

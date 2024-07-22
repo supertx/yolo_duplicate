@@ -89,7 +89,6 @@ class DecoupleHead(nn.Module):
             w.data.fill_(0.)
             conv.weight = torch.nn.Parameter(w, requires_grad=True)
 
-
     def forward(self, p5, p4, p3):
         p3 = self.stem1(p3)
         p4 = self.stem2(p4)
@@ -111,8 +110,8 @@ class DecoupleHead(nn.Module):
         cls3 = torch.sigmoid(cls3)
         cls3 = cls3.flatten(2).permute(0, 2, 1)
 
-        return (torch.cat([cls1, cls2, cls3], dim=1),
-                torch.cat([box1, box2, box3], dim=1))
+        return (torch.cat([cls3, cls2, cls1], dim=1),
+                torch.cat([box3, box2, box1], dim=1))
 
 
 if __name__ == "__main__":
@@ -124,4 +123,4 @@ if __name__ == "__main__":
         input.append(torch.randn(size))
     y = model(*input)
     print(y[1].shape)
-    print(y[2].shape)
+    print(y[0].shape)

@@ -26,7 +26,6 @@ class TaskAlignedAssigner(nn.Module):
         """
         pd_scores (Tensor): shape(bs, num_total_anchors, num_classes)
         pd_bboxes (Tensor): shape(bs, num_total_anchors, 4)
-        anc_points (Tensor): shape(num_total_anchors, 2)
         gt_labels (Tensor): shape(bs, n_max_boxes, 1)
         gt_bboxes (Tensor): shape(bs, n_max_boxes, 4)
         mask_gt (Tensor): shape(bs, n_max_boxes, 1)

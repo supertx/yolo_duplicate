@@ -3,19 +3,25 @@
 @date 2024/7/12 17:10
 训练yolov6
 """
-
+import sys
 import os
+sys.path.append(os.getcwd())
+print(sys.path)
 from datetime import datetime
+
 
 from tqdm import tqdm
 import torch
+from torch import nn
 from torch.optim.lr_scheduler import StepLR
+from matplotlib import pyplot as plt
 
 from dataset import get_dataloader
 from util.config_util import load_yaml
 from model import YOLOV6
 from yolo_duplicate.criterion.loss import ComputeLoss
-
+from yolo_duplicate.models.yolo import build_model
+from yolo_duplicate.util.config import Config
 
 def train_one_epoch(cfg, epoch, model, loss, dataloader, optimizer, device):
     model.train()
@@ -40,9 +46,25 @@ def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     compute_loss = ComputeLoss(warmup_epoch=cfg.WARMUP_EPOCH)
-    model = YOLOV6()
+    # model = YOLOV6()
+    c = Config.fromfile("config/yolov6n.py")
+    if not hasattr(c, 'training_mode'):
+        setattr(c, 'training_mode', 'repvgg')
+    model = build_model(c, 80, torch.device('cuda'), False, False)
     model.to(device)
-    optimizer = torch.optim.Adam(model.get_learnable_parameter(), lr=cfg.LR)
+    g_bnw, g_w, g_b = [], [], []
+    for v in model.modules():
+        if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):
+            g_b.append(v.bias)
+        if isinstance(v, nn.BatchNorm2d):
+            g_bnw.append(v.weight)
+        elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):
+            g_w.append(v.weight)
+
+    optimizer = torch.optim.Adam(g_bnw, lr=0.01, betas=(0.8, 0.999))
+    optimizer.add_param_group({'params': g_w, 'weight_decay': 0.001})
+    optimizer.add_param_group({'params': g_b})
+    # optimizer = torch.optim.Adam(model.get_learnable_parameter(), lr=cfg.LR)
     schedule_lr = StepLR(optimizer, step_size=cfg.STEP_SIZE, gamma=cfg.GAMMA)
     epoch = 0
 

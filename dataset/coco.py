@@ -105,7 +105,7 @@ class CocoDataset(Dataset):
 
     def __len__(self):
         # return len(self.img_name_list)
-        return 10000
+        return 1000
 
     def boxes_transform(self, boxes, ori_shape, img_shape):
         ret_box = []

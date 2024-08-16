@@ -7,10 +7,10 @@ import os
 
 from torch.utils.data import DataLoader
 
-from .coco import dataloader as coco_dataloader
+from .coco import dataloader as coco_dataloader, get_transform
 from yolo_duplicate.util.config_util import load_yaml
 
-__all__ = ["get_dataloader"]
+__all__ = ["get_dataloader", "get_transform"]
 
 datasets = ["coco"]
 

@@ -8,7 +8,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from yolo_duplicate.assigners import ATSSAssigner, TaskAlignedAssigner, generate_anchor
+from yolo_duplicate.assigners import ATSSAssigner, generate_anchor
+from yolo_duplicate.assigners.task_align_assigner import TaskAlignedAssigner
+# from yolo_duplicate.assigners.tal_assigner import TaskAlignedAssigner
 from yolo_duplicate.criterion.iou_loss import IOULoss
 
 
@@ -49,7 +51,7 @@ class ComputeLoss(nn.Module):
     def forward(self, outputs, targets, mask_gt, epoch_num):
         # cls_pred (bs, num_total_anchors, num_classes)
         # box_pred (bs, num_total_anchors, 4)
-        cls_pred, box_pred = outputs
+        _, cls_pred, box_pred = outputs[0]
 
         anchors, anchor_points, num_anchors_list, stride_tensor = \
             generate_anchor(self.img_size, self.fpn_strides, device="cuda")
@@ -73,8 +75,9 @@ class ComputeLoss(nn.Module):
                                    pred_boxes)
         else:
             target_labels, target_boxes, target_scores, candidate_id = \
-                self.task_align_assigner(cls_pred,
-                                         pred_boxes * stride_tensor,
+                self.task_align_assigner(cls_pred.detach(),
+                                         pred_boxes.detach() * stride_tensor,
+                                         # anchor_points,
                                          gt_labels,
                                          gt_boxes,
                                          mask_gt)
@@ -86,7 +89,7 @@ class ComputeLoss(nn.Module):
         targets_boxes /= stride_tensor
 
         label = F.one_hot(targets_labels.long(), self.num_classes + 1)[..., :-1]
-
+        # TODO cls loss的正确性检验, box loss中乘以权重, 感觉离正确训练非常接近了
         scores_sum = targets_scores.sum()
         if scores_sum > 0:
             # 分类损失
@@ -144,7 +147,6 @@ class BoxLoss(nn.Module):
             pred_boxes = pred_boxes.reshape(-1, 4)
             target_boxes = target_boxes.reshape(-1, 4)
             target_scores = target_scores.sum(-1).flatten()
-            # TODO 预测的box和目标的box对应不起来
             pred_boxes_pos = pred_boxes[mask, :]
             target_boxes_pos = target_boxes[mask, :]
             box_weight = target_scores[mask]
